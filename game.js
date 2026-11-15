@@ -4,25 +4,24 @@ const COLS = 10, ROWS = 20;
 const STORE = 'shogi-puzzle-v1';
 // ---------- piece definitions ----------
 const P = {
-  I: {k:'飛', name:'飛車', ab:'下を粉砕', color:'#00f0ff', m:['....','####','....','....'],
-      desc:'そろった列は先に通常ライン消去。横置き→自分の段と真下の1列を粉砕して詰める／縦置き→真下のブロックを床まで一閃で消す'},
-  T: {k:'角', name:'角行', ab:'斜め消し', color:'#ff2bd6', m:['.#.','###','...'],
-      desc:'中心から斜め4方向へ最大3マスのブロックを消し、上のブロックが落ちて詰まる'},
-  O: {k:'金', name:'金将', ab:'穴埋め', color:'#ffd23a', m:['##','##'],
-      desc:'置いた2列と左右1列ずつ（計4列）の「上がふさがった穴」を金で埋める'},
-  L: {k:'桂', name:'桂馬', ab:'跳び崩し', color:'#9dff3a', m:['..#','###','...'],
-      desc:'着地点の真下から桂馬跳び（2つ下×1つ横、1つ下×2つ横）の4マスを壊し、列を詰める'},
-  J: {k:'桂', name:'桂馬', ab:'跳び崩し', color:'#3affb0', m:['#..','###','...'],
-      desc:''},
-  S: {k:'歩', name:'歩兵', ab:'成りカウント', color:'#ff8a2b', m:['.##','##.','...'],
-      desc:'能力なし。ただし5個置くと、次の駒が「と金」に成る'},
-  Z: {k:'歩', name:'歩兵', ab:'成りカウント', color:'#ff5a3a', m:['##.','.##','...'],
-      desc:''},
-  P: {k:'と', name:'と金', ab:'穴もぐり', color:'#ff4f8b', m:['#'],
-      desc:'1マスの万能駒。着地した列の下にある穴へもぐり込んで埋める（そろいそうな行を優先）'},
-  K: {k:'王', name:'王将', ab:'大爆破', color:'#ffffff', m:['#'],
-      desc:'まれに出現。着地点の下を中心に3×3を吹き飛ばし、列を詰める'},
-  G: {k:'金', name:'金', ab:'', color:'#b89a2e', m:['#'], desc:''},
+  I: {k:'飛', name:'飛車', ab:'縦埋め', color:'#00f0ff', m:['....','####','....','....'],
+      desc:'飛車で列をそろえると、次の駒に「飛車の力」。次の駒が着地した列の穴を、上から下まで全部埋める（最強）'},
+  T: {k:'角', name:'角行', ab:'斜め埋め', color:'#ff2bd6', m:['.#.','###','...'],
+      desc:'角で列をそろえると「角の力」。次の駒の中心から斜め4方向（各3マス）にある穴を埋める'},
+  O: {k:'金', name:'金将', ab:'小埋め', color:'#ffd23a', m:['##','##'],
+      desc:'金で列をそろえると「金の力」。次の駒の列の穴を、近い順に最大2マスだけ埋める'},
+  L: {k:'桂', name:'桂馬', ab:'桂馬埋め', color:'#9dff3a', m:['..#','###','...'],
+      desc:'桂馬（L/J）で列をそろえると「桂馬の力」。次の駒の中心から桂馬跳び8か所にある穴を埋める'},
+  J: {k:'桂', name:'桂馬', ab:'桂馬埋め', color:'#3affb0', m:['#..','###','...'], desc:''},
+  S: {k:'歩', name:'歩兵', ab:'なし（成り）', color:'#ff8a2b', m:['.##','##.','...'],
+      desc:'能力なし（そろえても力は宿らない）。5個置くと次の駒が「と金」に成る'},
+  Z: {k:'歩', name:'歩兵', ab:'なし（成り）', color:'#ff5a3a', m:['##.','.##','...'], desc:''},
+  P: {k:'と', name:'と金', ab:'すり抜け埋め', color:'#ff4f8b', m:['#'],
+      desc:'いつでも自動発動。ブロックをすり抜けて、その列の一番そろいそうな穴に入って埋める'},
+  K: {k:'王', name:'王将', ab:'キングスフィールド', color:'#ffffff', m:['#'],
+      desc:'飛・角・金・桂・歩（成り）・と の6つが全部1回ずつ発動すると登場。すり抜けで穴に入り、自分を中心に5×5の24マスを全部埋める'},
+  G: {k:'', name:'ブロック', ab:'', color:'#8a90a8', m:['#'], desc:''},
+  F: {k:'◇', name:'埋め', ab:'', color:'#c9a0ff', m:['#'], desc:''},
 };
 const BAG = ['I','T','O','L','J','S','Z'];
 function toMat(rows){ return rows.map(r => [...r].map(ch => ch === '#')); }
@@ -48,7 +47,6 @@ function nextFromBag(){
     for (let i = bagLeft.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i+1)); [bagLeft[i], bagLeft[j]] = [bagLeft[j], bagLeft[i]]; }
   }
   const t = bagLeft.pop();
-  if (level >= 2 && rng() < 0.035) { bagLeft.push(t); return 'K'; }
   return t;
 }
 function fillQueue(){ while (queue.length < 3) queue.push(nextFromBag()); }
@@ -116,135 +114,124 @@ function hold(){
 }
 function canPlay(){ return running && !paused && !over && cur; }
 
-// ---------- abilities ----------
-function compactCols(xs){
-  for (const x of xs) {
-    if (x < 0 || x >= COLS) continue;
-    const col = [];
-    for (let y = ROWS - 1; y >= 0; y--) if (board[y][x]) col.push(board[y][x]);
-    for (let y = ROWS - 1, i = 0; y >= 0; y--, i++) board[y][x] = i < col.length ? col[i] : null;
-  }
-}
+// ---------- abilities: all hole-filling ----------
+const TRACK = ['I', 'T', 'O', 'L', 'S', 'P'];            // 飛 角 金 桂 歩(成り) と
+let charge = null, fired = new Set(), kingPending = false;
+function chargeOf(t){ return t === 'J' ? 'L' : ('ITOL'.includes(t) ? t : null); }
 function removeRow(y){ board.splice(y, 1); board.unshift(Array(COLS).fill(null)); }
 const inB = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS;
-
-// returns {text, cells:[[x,y]], count, color} or null. `pc` = placed cells.
-function applyAbility(t, pc, piece){
-  const own = new Set(pc.map(([x, y]) => x + ',' + y));
-  const res = {cells: [], count: 0, color: P[t].color, text: ''};
-  if (t === 'I') {
-    // 1) rows completed by the 飛車 count as normal line clears (resolved together with the smash)
-    const full = [];
-    for (let y = 0; y < ROWS; y++) if (board[y].every(Boolean)) full.push(y);
-    const fullSet = new Set(full);
-    const ys = [...new Set(pc.map(c => c[1]))];
-    const rm = new Set(full);
-    if (ys.length === 1) {               // horizontal: smash own row + the row directly beneath
-      const y = ys[0];
-      if (!fullSet.has(y)) {
-        for (let x = 0; x < COLS; x++) if (board[y][x] && !own.has(x + ',' + y)) { res.cells.push([x, y]); res.count++; }
-        rm.add(y);
-      }
-      if (y + 1 < ROWS) {
-        for (let x = 0; x < COLS; x++) if (board[y + 1][x]) { res.cells.push([x, y + 1]); res.count++; }
-        rm.add(y + 1);
-      }
-      res.text = '飛車！下一列粉砕';
-    } else {                             // vertical: the 飛車 + every block below it in its column
-      const x = pc[0][0], yb = Math.max(...ys);
-      for (let y = yb + 1; y < ROWS; y++) if (board[y][x]) { res.cells.push([x, y]); res.count++; board[y][x] = null; }
-      for (const [cx, cy] of pc) if (!fullSet.has(cy)) board[cy][cx] = null;
-      res.text = '飛車！縦一閃';
+function isHole(x, y){
+  if (!inB(x, y) || board[y][x]) return false;
+  for (let yy = y - 1; yy >= 0; yy--) if (board[yy][x]) return true;
+  return false;
+}
+function centerCell(pc){
+  const mx = pc.reduce((a, c) => a + c[0], 0) / pc.length, my = pc.reduce((a, c) => a + c[1], 0) / pc.length;
+  let best = pc[0], bd = 1e9;
+  for (const c of pc) { const d = (c[0] - mx) ** 2 + (c[1] - my) ** 2; if (d < bd - 1e-9 || (Math.abs(d - bd) < 1e-9 && c[1] > best[1])) { bd = d; best = c; } }
+  return best;
+}
+function fireCharge(c, pc){
+  const res = {cells: [], count: 0, color: P[c].color, key: c, charge: true};
+  const fill = (x, y) => { if (isHole(x, y)) { board[y][x] = 'F'; res.cells.push([x, y]); res.count++; } };
+  const xs = [...new Set(pc.map(p => p[0]))];
+  if (c === 'I') {
+    for (const x of xs) for (let y = 0; y < ROWS; y++) fill(x, y);
+    res.text = '飛車の力！縦埋め';
+  } else if (c === 'T') {
+    const [cx, cy] = centerCell(pc);
+    for (let d = 1; d <= 3; d++) for (const [dx, dy] of [[1,1],[-1,1],[1,-1],[-1,-1]]) fill(cx + dx * d, cy + dy * d);
+    res.text = '角の力！斜め埋め';
+  } else if (c === 'L') {
+    const [cx, cy] = centerCell(pc);
+    for (const [dx, dy] of [[-1,2],[1,2],[-2,1],[2,1],[-2,-1],[2,-1],[-1,-2],[1,-2]]) fill(cx + dx, cy + dy);
+    res.text = '桂馬の力！桂馬埋め';
+  } else if (c === 'O') {
+    const cand = [];
+    for (const x of xs) {
+      const bottom = Math.max(...pc.filter(p => p[0] === x).map(p => p[1]));
+      for (let y = bottom + 1; y < ROWS; y++) if (isHole(x, y)) cand.push([x, y, y - bottom]);
     }
-    for (const y of [...rm].sort((a, b) => a - b)) removeRow(y);
-    res.lineRows = full;
-  } else if (t === 'T') {
-    const cx = piece.x + 1, cy = piece.y + 1, xs = new Set();
-    for (const [dx, dy] of [[1,1],[-1,1],[1,-1],[-1,-1]]) for (let d = 1; d <= 3; d++) {
-      const x = cx + dx * d, y = cy + dy * d;
-      if (inB(x, y) && board[y][x] && !own.has(x + ',' + y)) { res.cells.push([x, y]); board[y][x] = null; xs.add(x); res.count++; }
-    }
-    res.diag = [cx, cy];
-    compactCols(xs); res.text = '角行！斜め消し';
-  } else if (t === 'O') {
-    const xs = pc.map(c => c[0]); const x0 = Math.min(...xs) - 1, x1 = Math.max(...xs) + 1;
-    for (let x = x0; x <= x1; x++) {
-      if (x < 0 || x >= COLS) continue;
-      let top = -1; for (let y = 0; y < ROWS; y++) if (board[y][x]) { top = y; break; }
-      if (top < 0) continue;
-      for (let y = top + 1; y < ROWS; y++) if (!board[y][x]) { board[y][x] = 'G'; res.cells.push([x, y]); res.count++; }
-    }
-    res.text = '金将！穴埋め';
-  } else if (t === 'L' || t === 'J') {
-    const ymax = Math.max(...pc.map(c => c[1]));
-    const bx = pc.filter(c => c[1] === ymax).map(c => c[0]);
-    const ox = Math.round((Math.min(...bx) + Math.max(...bx)) / 2);
-    const xs = new Set();
-    for (const [dx, dy] of [[-1,2],[1,2],[-2,1],[2,1]]) {
-      const x = ox + dx, y = ymax + dy;
-      if (inB(x, y) && board[y][x] && !own.has(x + ',' + y)) { res.cells.push([x, y]); board[y][x] = null; xs.add(x); res.count++; }
-    }
-    res.origin = [ox, ymax];
-    compactCols(xs); res.text = '桂馬！跳び崩し';
-  } else if (t === 'S' || t === 'Z') {
-    fuCount++;
-    if (fuCount >= 5) {
-      fuCount = 0; fillQueue(); queue[0] = 'P';
-      res.text = '歩兵5枚！と金に成る'; res.promo = true;
-    } else return {cells: [], count: 0, color: P[t].color, text: '', fu: true};
-  } else if (t === 'P') {
-    const [x, y] = pc[0]; let best = -1, bestFill = -1;
-    for (let yy = y + 1; yy < ROWS; yy++) if (!board[yy][x]) {
-      const f = board[yy].filter(Boolean).length;
-      if (f >= bestFill) { bestFill = f; best = yy; }
-    }
-    if (best >= 0) { board[y][x] = null; board[best][x] = 'P'; res.cells.push([x, best]); res.count = 1; res.text = 'と金！穴もぐり'; }
-    else res.text = 'と金！';
-  } else if (t === 'K') {
-    const [x, y] = pc[0]; const cy = y + 1, xs = new Set();
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const xx = x + dx, yy = cy + dy;
-      if (inB(xx, yy) && board[yy][xx]) { res.cells.push([xx, yy]); board[yy][xx] = null; xs.add(xx); res.count++; }
-    }
-    compactCols(xs); res.text = '王将！大爆破';
+    cand.sort((a, b) => a[2] - b[2] || a[0] - b[0]);
+    for (const [x, y] of cand.slice(0, 2)) fill(x, y);
+    res.text = '金の力！小埋め';
   }
   return res;
 }
-
+// と金/王: slip down through blocks into the most useful hole of its column
+function slip(x, y){
+  let best = -1, bestFill = -1;
+  for (let yy = y + 1; yy < ROWS; yy++) if (!board[yy][x]) {
+    const f = board[yy].filter(Boolean).length;
+    if (f >= bestFill) { bestFill = f; best = yy; }
+  }
+  if (best < 0) return y;
+  board[best][x] = board[y][x]; board[y][x] = null; return best;
+}
 function clearLines(){
   const full = [];
   for (let y = 0; y < ROWS; y++) if (board[y].every(Boolean)) full.push(y);
-  for (const y of full) { removeRow(y); }
+  for (const y of full) removeRow(y);
   return full;
 }
-
 function lockPiece(){
   const pc = cellsOf(cur);
   if (pc.some(([, y]) => y < 0)) { gameOver(); return; }
   for (const [x, y] of pc) board[y][x] = cur.t;
-  const t = cur.t, piece = {...cur};
-  const ab = applyAbility(t, pc, piece);
-  const full = (ab && ab.lineRows) ? ab.lineRows.concat(clearLines()) : clearLines();
+  const t = cur.t, used = charge; charge = null;
+  const evs = []; let fillCount = 0, kfCount = 0, pos = pc;
+  if (t === 'P' || t === 'K') {
+    const [x, y] = pc[0], ny = slip(x, y); pos = [[x, ny]];
+    const e = {cells: ny !== y ? [[x, ny]] : [], count: ny !== y ? 1 : 0, color: P[t].color, key: t};
+    if (t === 'P') { e.text = ny !== y ? 'と金！すり抜け埋め' : 'と金！'; fired.add('P'); fillCount += e.count; }
+    else {
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const xx = x + dx, yy = ny + dy;
+        if ((dx || dy) && inB(xx, yy) && !board[yy][xx]) { board[yy][xx] = 'F'; e.cells.push([xx, yy]); e.count++; }
+      }
+      e.text = 'キングスフィールド！'; e.king = true; e.center = [x, ny]; kfCount = e.count;
+    }
+    evs.push(e);
+  }
+  if (used) { const e = fireCharge(used, pos); fired.add(used); fillCount += e.count; evs.push(e); }
+  if (t === 'S' || t === 'Z') {
+    fuCount++;
+    if (fuCount >= 5) { fuCount = 0; fillQueue(); queue[0] = 'P'; fired.add('S'); evs.push({cells: [], count: 0, color: P.P.color, text: '歩兵5枚！と金に成る', promo: true}); }
+  }
+  const full = clearLines();
+  const newCharge = full.length ? chargeOf(t) : null;
+  charge = newCharge;
+  if (t === 'K') { fired.clear(); kingPending = false; }
+  else if (!kingPending && TRACK.every(k => fired.has(k))) {
+    kingPending = true; fillQueue();
+    if (queue[0] === 'P') queue.splice(1, 0, 'K'); else queue.unshift('K');
+    evs.push({cells: [], count: 0, color: '#ffffff', text: '王将、出陣！', kingCall: true});
+  }
   // scoring
-  let gained = 0, active = false;
-  if (ab && ab.count > 0) { gained += (50 + 15 * ab.count) * level; active = true; }
-  if (full.length) { gained += [0, 100, 300, 500, 800][Math.min(4, full.length)] * level; active = true; }
+  let gained = 0;
+  if (fillCount > 0) gained += (40 + 30 * fillCount) * level;
+  if (kfCount > 0) gained += (500 + 60 * kfCount) * level;
+  if (full.length) gained += [0, 100, 300, 500, 800][Math.min(4, full.length)] * level;
+  const active = full.length > 0 || fillCount > 0 || kfCount > 0;
   if (active) { combo++; if (combo > 0) gained += 50 * combo * level; } else combo = -1;
   score += gained; lines += full.length;
-  const nl = Math.floor(lines / 10) + 1; if (nl > level) { level = nl; toast('LEVEL ' + level, '#9dff3a'); }
-  // effects
-  if (ab && ab.text) {
-    effect(ab, t);
-    const extra = ab.count > 0 ? ' +' + ab.count : '';
-    toast(ab.text + extra, ab.color);
-  }
+  const nl = Math.floor(lines / 10) + 1; const lvUp = nl > level; if (lvUp) level = nl;
+  // effects + text
+  for (const e of evs) effect(e);
   if (full.length) {
     for (const y of full) flashes.push({y, life: 1, color: '#ffffff'});
     for (const y of full) for (let x = 0; x < COLS; x++) burst(x, y, '#00f0ff', 4);
-    if (!ab || !ab.text || ab.fu) toast(full.length >= 4 ? 'TETRA!! ' + full.length + 'ライン' : full.length + 'ライン', '#00f0ff');
   }
+  const msg = [];
+  const main = evs.find(e => e.king) || evs.find(e => e.charge) || evs.find(e => e.key === 'P') || evs.find(e => e.promo);
+  if (main) msg.push(main.text + (main.count > 0 ? ' +' + main.count : ''));
+  if (full.length) msg.push(full.length >= 4 ? 'TETRA!! ' + full.length + 'ライン' : full.length + 'ライン');
+  if (newCharge) msg.push('⚡ ' + P[newCharge].name + 'の力 チャージ');
+  if (evs.some(e => e.kingCall)) msg.push('王将、出陣！');
+  if (lvUp) msg.push('LEVEL ' + level);
+  if (msg.length) toast(msg.join('\n'), main ? main.color : (newCharge ? P[newCharge].color : '#00f0ff'));
   if (combo > 0) toastCombo(combo);
-  lastLock = {type: t, ability: ab, lines: full.length, gained};
+  lastLock = {type: t, used, events: evs.map(e => ({text: e.text, count: e.count})), fills: fillCount, kf: kfCount, lines: full.length, gained, charge};
   cur = null;
   updateHud();
   if (!over) spawnNext();
@@ -259,11 +246,17 @@ function burst(x, y, color, n = 8){
     particles.push({x: x + 0.5, y: y + 0.5, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.05, life: 1, color, r: 1 + rng() * 2.2});
   }
 }
-function effect(ab, t){
+let rings = [];
+function effect(ab){
   const c = ab.color;
-  for (const [x, y] of ab.cells) { burst(x, y, c, 10); clearAnims.push({x, y, life: 1, color: c}); }
-  screenFlash = {color: c, life: 1};
-  if (ab.promo) screenFlash.color = '#ff4f8b';
+  for (const [x, y] of ab.cells) { burst(x, y, c, ab.king ? 14 : 10); clearAnims.push({x, y, life: 1, color: c}); }
+  if (ab.cells.length || ab.promo || ab.kingCall) screenFlash = {color: c, life: 1};
+  if (ab.king) {
+    const [x, y] = ab.center;
+    rings.push({x, y, r: 0, life: 1, color: '#ffffff'}, {x, y, r: -0.8, life: 1.2, color: '#ffd23a'}, {x, y, r: -1.6, life: 1.4, color: '#ff2bd6'});
+    for (let i = 0; i < 60; i++) burst(x, y, ['#ffffff', '#ffd23a', '#00f0ff', '#ff2bd6'][i % 4], 1);
+    screenFlash = {color: '#ffffff', life: 1.6};
+  }
 }
 let screenFlash = null;
 let toastTimer = 0;
@@ -291,13 +284,13 @@ function makeSprite(t, cs, ghost = false){
   x.shadowColor = col; x.shadowBlur = g * 0.9;
   rr(g + pad, g + pad, cs - pad * 2, cs - pad * 2);
   const grad = x.createLinearGradient(0, g, 0, g + cs);
-  grad.addColorStop(0, hexA(col, t === 'G' ? 0.35 : 0.55)); grad.addColorStop(1, hexA(col, t === 'G' ? 0.12 : 0.18));
+  grad.addColorStop(0, hexA(col, t === 'G' ? 0.35 : t === 'F' ? 0.7 : 0.55)); grad.addColorStop(1, hexA(col, t === 'G' ? 0.12 : t === 'F' ? 0.3 : 0.18));
   x.fillStyle = grad; x.fill();
   x.lineWidth = Math.max(1.5, cs * 0.07); x.strokeStyle = col; x.stroke();
   x.shadowBlur = g * 0.6; x.fillStyle = '#ffffff';
   x.font = `900 ${Math.floor(cs * 0.6)}px "Hiragino Mincho ProN","Noto Serif JP","Noto Serif CJK JP",serif`;
   x.textAlign = 'center'; x.textBaseline = 'middle';
-  if (t !== 'G') x.fillText(P[t].k, g + cs / 2, g + cs / 2 + cs * 0.03);
+  if (P[t].k) x.fillText(P[t].k, g + cs / 2, g + cs / 2 + cs * 0.03);
   return c;
 }
 function hexA(hex, a){ const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
@@ -324,7 +317,9 @@ function render(){
   if (cur && !over) {
     const gy = ghostY();
     for (const [x, y] of cellsOf(cur, cur.rot, cur.x, gy)) if (y >= 0) drawSprite(ctx, cur.t + '_g', x * CS, y * CS, CS);
+    if (charge) drawAura(cellsOf(cur));
     for (const [x, y] of cellsOf(cur)) if (y >= 0) drawSprite(ctx, cur.t, x * CS, y * CS, CS);
+    if (charge) drawAuraLabel(cellsOf(cur));
   }
   ctx.globalCompositeOperation = 'lighter';
   for (const a of clearAnims) {
@@ -337,11 +332,39 @@ function render(){
     ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.color;
     ctx.beginPath(); ctx.arc(p.x * CS, p.y * CS, p.r * (CS / 26), 0, Math.PI * 2); ctx.fill();
   }
-  if (screenFlash) { ctx.globalAlpha = screenFlash.life * 0.22; ctx.fillStyle = screenFlash.color; ctx.fillRect(0, 0, W, H); }
+  for (const g of rings) if (g.r > 0) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, g.life)); ctx.strokeStyle = g.color; ctx.lineWidth = CS * 0.25;
+    ctx.beginPath(); ctx.arc((g.x + .5) * CS, (g.y + .5) * CS, g.r * CS, 0, Math.PI * 2); ctx.stroke();
+  }
+  if (screenFlash) { ctx.globalAlpha = Math.min(1, screenFlash.life) * 0.22; ctx.fillStyle = screenFlash.color; ctx.fillRect(0, 0, W, H); }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+function drawAura(cells){
+  const col = P[charge].color, pulse = 0.55 + 0.45 * Math.sin(performance.now() / 160);
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.shadowColor = col; ctx.shadowBlur = CS * (0.6 + 0.6 * pulse);
+  ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, CS * 0.12); ctx.globalAlpha = 0.5 + 0.5 * pulse;
+  for (const [x, y] of cells) if (y >= 0) ctx.strokeRect(x * CS - 2, y * CS - 2, CS + 4, CS + 4);
+  ctx.globalAlpha = 0.18 * pulse; ctx.fillStyle = col;
+  for (const [x, y] of cells) if (y >= 0) ctx.fillRect(x * CS - 3, y * CS - 3, CS + 6, CS + 6);
+  ctx.restore();
+}
+function drawAuraLabel(cells){
+  const col = P[charge].color;
+  const minY = Math.min(...cells.map(c => c[1])), maxY = Math.max(...cells.map(c => c[1]));
+  const cx = (Math.min(...cells.map(c => c[0])) + Math.max(...cells.map(c => c[0])) + 1) / 2 * CS;
+  let ty = minY * CS - CS * 0.35; if (ty < CS * 0.5) ty = (maxY + 1) * CS + CS * 0.55;
+  const txt = '⚡' + P[charge].name + 'の力';
+  ctx.save(); ctx.font = `900 ${Math.max(11, Math.floor(CS * 0.55))}px -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(txt).width; const x = Math.max(w / 2 + 2, Math.min(COLS * CS - w / 2 - 2, cx));
+  ctx.shadowColor = col; ctx.shadowBlur = 10; ctx.fillStyle = col; ctx.fillText(txt, x, ty);
+  ctx.shadowBlur = 0; ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.85; ctx.fillText(txt, x, ty);
+  ctx.restore();
 }
 function stepFx(dt){
   const k = dt / 16.7;
+  for (const g of rings) { g.r += 0.18 * k; g.life -= 0.02 * k; } rings = rings.filter(g => g.life > 0);
   for (const p of particles) { p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.012 * k; p.life -= 0.022 * k; }
   particles = particles.filter(p => p.life > 0);
   for (const a of clearAnims) a.life -= 0.05 * k; clearAnims = clearAnims.filter(a => a.life > 0);
@@ -369,6 +392,16 @@ function updateHud(){
   if (combo <= 0) $('combo').textContent = '-';
   const fm = $('fuMeter'); fm.innerHTML = '';
   for (let i = 0; i < 5; i++) { const e = document.createElement('i'); if (i < fuCount) e.className = 'on'; fm.appendChild(e); }
+  const ch = $('chargeLbl');
+  if (charge) { ch.innerHTML = `<b style="color:${P[charge].color};text-shadow:0 0 8px ${P[charge].color}">${P[charge].k}</b>${P[charge].ab}`; ch.parentNode.classList.add('lit'); }
+  else { ch.textContent = 'なし'; ch.parentNode.classList.remove('lit'); }
+  $('track').innerHTML = TRACK.map(k => `<span class="${fired.has(k) ? 'on' : ''}" style="--c:${P[k].color}">${P[k].k}</span>`).join('');
+  $('track').parentNode.classList.toggle('lit', kingPending);
+}
+function nextAbText(t){
+  const c = chargeOf(t);
+  if (c) return 'そろえる→' + P[c].ab;
+  return P[t].ab;
 }
 function sideSize(){ return Math.floor(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--side')) - 8); }
 function updateSide(){
@@ -376,7 +409,7 @@ function updateSide(){
   drawMini($('holdCv'), holdT, s); $('holdName').textContent = holdT ? P[holdT].k + ' ' + P[holdT].name : '-';
   fillQueue();
   const n = queue[0];
-  drawMini($('nextCv'), n, s); $('nextName').textContent = P[n].k + ' ' + P[n].name; $('nextAb').textContent = P[n].ab;
+  drawMini($('nextCv'), n, s); $('nextName').textContent = P[n].k + ' ' + P[n].name; $('nextAb').textContent = nextAbText(n);
   drawMini($('next2Cv'), queue[1], Math.floor(s * 0.7)); drawMini($('next3Cv'), queue[2], Math.floor(s * 0.7));
   updateHud();
 }
@@ -425,7 +458,8 @@ function loop(ts){
 function newGame(seed){
   board = emptyBoard(); queue = []; bagLeft = []; holdT = null; holdUsed = false;
   score = 0; lines = 0; level = 1; combo = -1; fuCount = 0; over = false; paused = false; running = true;
-  particles = []; flashes = []; clearAnims = []; screenFlash = null; lastLock = null;
+  particles = []; flashes = []; clearAnims = []; rings = []; screenFlash = null; lastLock = null;
+  charge = null; fired = new Set(); kingPending = false;
   showOverlay(null); spawnNext(); updateHud();
 }
 function gameOver(){
@@ -532,7 +566,9 @@ window.__test = {
   cells(){ return cur ? cellsOf(cur) : null; },
   drop(){ hardDrop(); return lastLock; },
   lock(){ lockPiece(); return lastLock; },
-  state(){ return {score, lines, level, combo, fuCount, over, running, paused, queue: queue.slice(), hold: holdT, cur: cur && {...cur}}; },
+  state(){ return {score, lines, level, combo, fuCount, over, running, paused, queue: queue.slice(), hold: holdT, cur: cur && {...cur}, charge, fired: [...fired], kingPending}; },
+  setCharge(c){ charge = c; updateHud(); },
+  setFired(a){ fired = new Set(a); kingPending = false; updateHud(); },
   setFu(n){ fuCount = n; },
   setQueue(q){ queue = q.slice(); },
   pause, resume, hold, move, rotate, softDrop,

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'shogi-puzzle-v2';
-const ASSETS = ['./', './index.html', './style.css?v=2', './game.js?v=2', './manifest.json',
+const CACHE_NAME = 'shogi-puzzle-v3';
+const ASSETS = ['./', './index.html', './style.css?v=3', './game.js?v=3', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-192.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-48.png'];
 self.addEventListener('install', e => {
