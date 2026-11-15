@@ -4,8 +4,8 @@ const COLS = 10, ROWS = 20;
 const STORE = 'shogi-puzzle-v1';
 // ---------- piece definitions ----------
 const P = {
-  I: {k:'飛', name:'飛車', ab:'列消し', color:'#00f0ff', m:['....','####','....','....'],
-      desc:'横置き→その横1列を消す／縦置き→その縦1列を丸ごと消す'},
+  I: {k:'飛', name:'飛車', ab:'下を粉砕', color:'#00f0ff', m:['....','####','....','....'],
+      desc:'そろった列は先に通常ライン消去。横置き→自分の段と真下の1列を粉砕して詰める／縦置き→真下のブロックを床まで一閃で消す'},
   T: {k:'角', name:'角行', ab:'斜め消し', color:'#ff2bd6', m:['.#.','###','...'],
       desc:'中心から斜め4方向へ最大3マスのブロックを消し、上のブロックが落ちて詰まる'},
   O: {k:'金', name:'金将', ab:'穴埋め', color:'#ffd23a', m:['##','##'],
@@ -133,16 +133,31 @@ function applyAbility(t, pc, piece){
   const own = new Set(pc.map(([x, y]) => x + ',' + y));
   const res = {cells: [], count: 0, color: P[t].color, text: ''};
   if (t === 'I') {
-    const ys = new Set(pc.map(c => c[1]));
-    if (ys.size === 1) {               // horizontal -> clear row
-      const y = pc[0][1];
-      for (let x = 0; x < COLS; x++) if (board[y][x]) { res.cells.push([x, y]); res.count++; }
-      removeRow(y); res.text = '飛車！横一列消し';
-    } else {                           // vertical -> clear column
-      const x = pc[0][0];
-      for (let y = 0; y < ROWS; y++) if (board[y][x]) { res.cells.push([x, y]); res.count++; board[y][x] = null; }
-      res.text = '飛車！縦一列消し';
+    // 1) rows completed by the 飛車 count as normal line clears (resolved together with the smash)
+    const full = [];
+    for (let y = 0; y < ROWS; y++) if (board[y].every(Boolean)) full.push(y);
+    const fullSet = new Set(full);
+    const ys = [...new Set(pc.map(c => c[1]))];
+    const rm = new Set(full);
+    if (ys.length === 1) {               // horizontal: smash own row + the row directly beneath
+      const y = ys[0];
+      if (!fullSet.has(y)) {
+        for (let x = 0; x < COLS; x++) if (board[y][x] && !own.has(x + ',' + y)) { res.cells.push([x, y]); res.count++; }
+        rm.add(y);
+      }
+      if (y + 1 < ROWS) {
+        for (let x = 0; x < COLS; x++) if (board[y + 1][x]) { res.cells.push([x, y + 1]); res.count++; }
+        rm.add(y + 1);
+      }
+      res.text = '飛車！下一列粉砕';
+    } else {                             // vertical: the 飛車 + every block below it in its column
+      const x = pc[0][0], yb = Math.max(...ys);
+      for (let y = yb + 1; y < ROWS; y++) if (board[y][x]) { res.cells.push([x, y]); res.count++; board[y][x] = null; }
+      for (const [cx, cy] of pc) if (!fullSet.has(cy)) board[cy][cx] = null;
+      res.text = '飛車！縦一閃';
     }
+    for (const y of [...rm].sort((a, b) => a - b)) removeRow(y);
+    res.lineRows = full;
   } else if (t === 'T') {
     const cx = piece.x + 1, cy = piece.y + 1, xs = new Set();
     for (const [dx, dy] of [[1,1],[-1,1],[1,-1],[-1,-1]]) for (let d = 1; d <= 3; d++) {
@@ -209,7 +224,7 @@ function lockPiece(){
   for (const [x, y] of pc) board[y][x] = cur.t;
   const t = cur.t, piece = {...cur};
   const ab = applyAbility(t, pc, piece);
-  const full = clearLines();
+  const full = (ab && ab.lineRows) ? ab.lineRows.concat(clearLines()) : clearLines();
   // scoring
   let gained = 0, active = false;
   if (ab && ab.count > 0) { gained += (50 + 15 * ab.count) * level; active = true; }
