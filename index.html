@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07070f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="将棋パズル">
+<title>将棋パズル NEON</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/favicon-48.png" sizes="48x48">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="stat"><span class="lbl">SCORE</span><span id="score" class="val">0</span></div>
+    <div class="stat"><span class="lbl">LEVEL</span><span id="level" class="val">1</span></div>
+    <div class="stat"><span class="lbl">LINES</span><span id="lines" class="val">0</span></div>
+    <button id="btnPause" class="iconbtn" aria-label="一時停止">II</button>
+  </header>
+  <main id="play">
+    <aside id="left" class="side">
+      <div class="panel"><div class="ptitle">HOLD</div><canvas id="holdCv"></canvas><div id="holdName" class="pname">-</div></div>
+      <div class="panel"><div class="ptitle">歩 → と金</div><div id="fuMeter" class="fumeter"></div></div>
+      <div class="panel"><div class="ptitle">COMBO</div><div id="combo" class="val small">-</div></div>
+    </aside>
+    <div id="boardWrap">
+      <canvas id="board"></canvas>
+      <div id="toast"></div>
+    </div>
+    <aside id="right" class="side">
+      <div class="panel"><div class="ptitle">NEXT</div><canvas id="nextCv"></canvas><div id="nextName" class="pname">-</div><div id="nextAb" class="pab">-</div></div>
+      <div class="panel"><canvas id="next2Cv"></canvas><canvas id="next3Cv"></canvas></div>
+    </aside>
+  </main>
+  <footer id="controls">
+    <button class="cbtn" data-act="hold">ホールド</button>
+    <button class="cbtn hot" data-act="hard">⤓<small>ハード</small></button>
+    <button class="cbtn hot2" data-act="rotate">↻<small>回転</small></button>
+    <button class="cbtn" data-act="left">←</button>
+    <button class="cbtn" data-act="soft">↓<small>ソフト</small></button>
+    <button class="cbtn" data-act="right">→</button>
+  </footer>
+
+  <section id="title" class="overlay show">
+    <div class="logo"><span class="k">将</span><span class="k2">棋</span><span class="logo-t">PUZZLE</span></div>
+    <p class="sub">駒の形ごとに、置いた瞬間<br>能力が自動で発動するパズル</p>
+    <button class="big" id="btnStart">スタート</button>
+    <button class="big ghost" id="btnHow">遊び方</button>
+    <div class="best" id="bestList"></div>
+  </section>
+
+  <section id="howto" class="overlay">
+    <h2>遊び方</h2>
+    <p class="note">ブロックを並べて横1列をそろえると消えます。駒は<b>置いた瞬間</b>に能力が発動！</p>
+    <div id="legend"></div>
+    <p class="note">操作：ボタン / 盤面タップ＝回転・左右スワイプ＝移動・下スワイプ＝ハードドロップ<br>キーボード：← → ↓、↑/X 回転、Z 逆回転、Space ハード、C ホールド、P 一時停止</p>
+    <button class="big" id="btnHowClose">とじる</button>
+  </section>
+
+  <section id="pause" class="overlay">
+    <h2>一時停止</h2>
+    <button class="big" id="btnResume">つづける</button>
+    <button class="big ghost" id="btnHow2">遊び方</button>
+    <button class="big ghost" id="btnQuit">タイトルへ</button>
+  </section>
+
+  <section id="over" class="overlay">
+    <h2 class="go">GAME OVER</h2>
+    <div class="final">SCORE <span id="finalScore">0</span></div>
+    <div id="newBest" class="newbest"></div>
+    <div class="best" id="bestList2"></div>
+    <button class="big" id="btnRetry">もう一度</button>
+    <button class="big ghost" id="btnTitle">タイトルへ</button>
+  </section>
+</div>
+<script src="game.js?v=1"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
